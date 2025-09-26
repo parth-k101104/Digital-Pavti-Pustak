@@ -66,7 +66,7 @@ export default function LoginScreen() {
   const showDemoCredentials = () => {
     Alert.alert(
       'Demo Credentials',
-      'Admin User:\nUsername: admin\nPassword: admin123\n\nRegular User:\nUsername: user1\nPassword: user123\n\nDonor User:\nUsername: donor\nPassword: donor123',
+      'Admin Users:\n• Username: admin\n  Password: admin123\n• Username: demo_admin\n  Password: demo123\n\nRegular Users:\n• Username: user\n  Password: user123\n• Username: demo_user\n  Password: demo123',
       [{ text: 'OK' }]
     );
   };
