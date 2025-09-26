@@ -6,7 +6,7 @@ const AuthContext = createContext({});
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(false); // no initial loading needed
+  const [isLoading, setIsLoading] = useState(true); // <-- start true
   const [authKey, setAuthKey] = useState(0); // Force re-render key
 
   // Mock user database
@@ -15,6 +15,25 @@ export const AuthProvider = ({ children }) => {
     { id: 2, username: 'user1', password: 'user123', role: 'user', name: 'Regular User' },
     { id: 3, username: 'donor', password: 'donor123', role: 'donor', name: 'Donor User' }
   ];
+
+  // Restore user on app start
+  useEffect(() => {
+    const restoreUser = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem('user');
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(parsedUser);
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error('Error restoring user:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    restoreUser();
+  }, []);
 
   // Login
   const login = async (username, password) => {
@@ -30,6 +49,7 @@ export const AuthProvider = ({ children }) => {
 
         setUser(userWithoutPassword);
         setIsAuthenticated(true);
+        setAuthKey(prev => prev + 1); // re-render navigation
 
         return { success: true, user: userWithoutPassword };
       } else {
@@ -50,7 +70,7 @@ export const AuthProvider = ({ children }) => {
 
       setUser(null);
       setIsAuthenticated(false);
-      setAuthKey(prev => prev + 1);
+      setAuthKey(prev => prev + 1); // trigger re-render
       console.log('✅ State cleared - logged out');
     } catch (error) {
       console.error('❌ Logout error:', error);
@@ -66,6 +86,7 @@ export const AuthProvider = ({ children }) => {
       console.log('All AsyncStorage cleared');
       setUser(null);
       setIsAuthenticated(false);
+      setAuthKey(prev => prev + 1);
     } catch (error) {
       console.error('Error clearing storage:', error);
     }
@@ -96,6 +117,7 @@ export const useAuth = () => {
 };
 
 export default AuthContext;
+
 
 
 

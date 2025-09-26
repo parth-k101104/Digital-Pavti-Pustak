@@ -17,23 +17,9 @@ function CustomDrawerContent({ navigation, state }) {
   const { user, logout, isAdmin } = useAuth();
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('Logout button pressed'); // Debug log
-            await logout();
-            console.log('Logout completed'); // Debug log
-          }
-        }
-      ]
-    );
-  };
+  console.log("Logout button pressed directly"); 
+  logout();
+};
 
   const isActiveRoute = (routeName) => {
     const currentRoute = state.routes[state.index];
