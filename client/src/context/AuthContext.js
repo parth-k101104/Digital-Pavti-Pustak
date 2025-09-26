@@ -1,33 +1,53 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiService from '../services/apiService';
 
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true); // <-- start true
+  const [isLoading, setIsLoading] = useState(true);
   const [authKey, setAuthKey] = useState(0); // Force re-render key
-
-  // Mock user database
-  const mockUsers = [
-    { id: 1, username: 'admin', password: 'admin123', role: 'admin', name: 'Administrator' },
-    { id: 2, username: 'user1', password: 'user123', role: 'user', name: 'Regular User' },
-    { id: 3, username: 'donor', password: 'donor123', role: 'donor', name: 'Donor User' }
-  ];
+  const [backendAvailable, setBackendAvailable] = useState(false);
 
   // Restore user on app start
   useEffect(() => {
     const restoreUser = async () => {
       try {
-        const storedUser = await AsyncStorage.getItem('user');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          setUser(parsedUser);
+        console.log('🔄 Restoring user session...');
+
+        // Check if backend is available
+        const isAvailable = await apiService.isBackendAvailable();
+        setBackendAvailable(isAvailable);
+
+        if (!isAvailable) {
+          console.warn('⚠️ Backend not available, using offline mode');
+          setIsLoading(false);
+          return;
+        }
+
+        // Try to validate existing token
+        const result = await apiService.validateToken();
+
+        if (result.success && result.data?.valid) {
+          console.log('✅ Token valid, restoring user session');
+          const userData = {
+            username: result.data.username,
+            role: result.data.role,
+            name: result.data.username, // Use username as display name for now
+            redirectTo: result.data.redirectTo,
+          };
+
+          setUser(userData);
           setIsAuthenticated(true);
+        } else {
+          console.log('❌ Token invalid or expired');
+          await apiService.removeToken();
         }
       } catch (error) {
         console.error('Error restoring user:', error);
+        await apiService.removeToken();
       } finally {
         setIsLoading(false);
       }
@@ -38,22 +58,51 @@ export const AuthProvider = ({ children }) => {
   // Login
   const login = async (username, password) => {
     try {
-      const foundUser = mockUsers.find(
-        u => u.username === username && u.password === password
-      );
+      console.log('🔐 Attempting login for:', username);
 
-      if (foundUser) {
-        const { password: _, ...userWithoutPassword } = foundUser;
+      // Check if backend is available
+      if (!backendAvailable) {
+        const isAvailable = await apiService.isBackendAvailable();
+        setBackendAvailable(isAvailable);
 
-        await AsyncStorage.setItem('user', JSON.stringify(userWithoutPassword));
+        if (!isAvailable) {
+          return {
+            success: false,
+            error: 'Backend server is not available. Please check your connection and try again.'
+          };
+        }
+      }
 
-        setUser(userWithoutPassword);
+      const result = await apiService.login(username, password);
+
+      if (result.success && result.data?.success) {
+        const loginData = result.data;
+        console.log('✅ Login successful:', loginData);
+
+        // Store token
+        await apiService.setToken(loginData.token);
+
+        // Create user object
+        const userData = {
+          username: loginData.username,
+          role: loginData.role,
+          name: loginData.username, // Use username as display name
+          redirectTo: loginData.redirectTo,
+        };
+
+        setUser(userData);
         setIsAuthenticated(true);
         setAuthKey(prev => prev + 1); // re-render navigation
 
-        return { success: true, user: userWithoutPassword };
+        return {
+          success: true,
+          user: userData,
+          redirectTo: loginData.redirectTo
+        };
       } else {
-        return { success: false, error: 'Invalid username or password' };
+        const errorMessage = result.data?.message || result.error || 'Invalid username or password';
+        console.log('❌ Login failed:', errorMessage);
+        return { success: false, error: errorMessage };
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -65,8 +114,15 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     console.log('🔓 Logout function called');
     try {
-      await AsyncStorage.removeItem('user');
-      console.log('🗑️ User removed from storage');
+      // Call backend logout if available
+      if (backendAvailable) {
+        await apiService.logout();
+      } else {
+        // Remove token locally if backend not available
+        await apiService.removeToken();
+      }
+
+      console.log('🗑️ Token removed from storage');
 
       setUser(null);
       setIsAuthenticated(false);
@@ -74,8 +130,11 @@ export const AuthProvider = ({ children }) => {
       console.log('✅ State cleared - logged out');
     } catch (error) {
       console.error('❌ Logout error:', error);
+      // Always clear local state even if backend call fails
+      await apiService.removeToken();
       setUser(null);
       setIsAuthenticated(false);
+      setAuthKey(prev => prev + 1);
     }
   };
 
@@ -83,7 +142,8 @@ export const AuthProvider = ({ children }) => {
   const clearStorage = async () => {
     try {
       await AsyncStorage.clear();
-      console.log('All AsyncStorage cleared');
+      await apiService.removeToken();
+      console.log('All storage cleared');
       setUser(null);
       setIsAuthenticated(false);
       setAuthKey(prev => prev + 1);
@@ -92,7 +152,52 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const isAdmin = () => user?.role === 'admin';
+  // Get all users (admin only)
+  const getAllUsers = async () => {
+    if (!isAdmin()) {
+      return { success: false, error: 'Access denied' };
+    }
+
+    try {
+      const result = await apiService.getAllUsers();
+
+      // Handle token expiration
+      if (result.tokenExpired) {
+        console.log('🔑 Token expired during API call, logging out');
+        await logout();
+        return { success: false, error: 'Session expired. Please login again.' };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Error getting users:', error);
+      return { success: false, error: 'Failed to fetch users' };
+    }
+  };
+
+  // Validate current session
+  const validateSession = async () => {
+    try {
+      const result = await apiService.validateToken();
+
+      if (!result.success || !result.data?.valid) {
+        console.log('🔑 Session validation failed, logging out');
+        await logout();
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Session validation error:', error);
+      await logout();
+      return false;
+    }
+  };
+
+  // Check if user is admin (backend uses 'ADMIN' role)
+  const isAdmin = () => user?.role === 'ADMIN';
+
+  // Check if user has specific role
   const hasRole = role => user?.role === role;
 
   const value = {
@@ -100,9 +205,12 @@ export const AuthProvider = ({ children }) => {
     user,
     isLoading,
     authKey,
+    backendAvailable,
     login,
     logout,
     clearStorage,
+    getAllUsers,
+    validateSession,
     isAdmin,
     hasRole,
   };
@@ -117,197 +225,3 @@ export const useAuth = () => {
 };
 
 export default AuthContext;
-
-
-
-
-// import React, { createContext, useContext, useState, useEffect } from 'react';
-// import AsyncStorage from '@react-native-async-storage/async-storage';
-
-// const AuthContext = createContext({});
-
-// export const AuthProvider = ({ children }) => {
-//   const [isAuthenticated, setIsAuthenticated] = useState(false);
-//   const [user, setUser] = useState(null);
-//   const [isLoading, setIsLoading] = useState(true);
-//   const [authKey, setAuthKey] = useState(0); // Force re-render key
-
-//   // Check if user is already logged in when app starts
-//   useEffect(() => {
-//     console.log('AuthProvider mounted, checking auth state...'); // Debug log
-//     checkAuthState();
-//   }, []);
-
-//   // Debug effect to track authentication state changes
-//   useEffect(() => {
-//     console.log('🔄 Authentication state changed:', {
-//       isAuthenticated,
-//       user: user?.username || 'null',
-//       userRole: user?.role || 'null',
-//       isLoading
-//     });
-//   }, [isAuthenticated, user, isLoading]);
-
-//   const checkAuthState = async () => {
-//     try {
-//       const userData = await AsyncStorage.getItem('user');
-//       console.log('Checking auth state, stored user data:', userData); // Debug log
-//       if (userData) {
-//         const parsedUser = JSON.parse(userData);
-//         console.log('Parsed user:', parsedUser); // Debug log
-//         setUser(parsedUser);
-//         setIsAuthenticated(true);
-//       } else {
-//         console.log('No stored user data found'); // Debug log
-//         setUser(null);
-//         setIsAuthenticated(false);
-//       }
-//     } catch (error) {
-//       console.error('Error checking auth state:', error);
-//       setUser(null);
-//       setIsAuthenticated(false);
-//     } finally {
-//       setIsLoading(false);
-//     }
-//   };
-
-//   // Mock user database - In a real app, this would be an API call
-//   const mockUsers = [
-//     {
-//       id: 1,
-//       username: 'admin',
-//       password: 'admin123',
-//       role: 'admin',
-//       name: 'Administrator'
-//     },
-//     {
-//       id: 2,
-//       username: 'user1',
-//       password: 'user123',
-//       role: 'user',
-//       name: 'Regular User'
-//     },
-//     {
-//       id: 3,
-//       username: 'donor',
-//       password: 'donor123',
-//       role: 'donor',
-//       name: 'Donor User'
-//     }
-//   ];
-
-//   // Login function
-//   const login = async (username, password) => {
-//     try {
-//       // Find user in mock database
-//       const foundUser = mockUsers.find(
-//         u => u.username === username && u.password === password
-//       );
-
-//       if (foundUser) {
-//         // Remove password from user object for security
-//         const { password: _, ...userWithoutPassword } = foundUser;
-        
-//         // Save user data to AsyncStorage
-//         await AsyncStorage.setItem('user', JSON.stringify(userWithoutPassword));
-        
-//         // Update state
-//         setUser(userWithoutPassword);
-//         setIsAuthenticated(true);
-        
-//         return { success: true, user: userWithoutPassword };
-//       } else {
-//         return { success: false, error: 'Invalid username or password' };
-//       }
-//     } catch (error) {
-//       console.error('Login error:', error);
-//       return { success: false, error: 'Login failed. Please try again.' };
-//     }
-//   };
-
-//   // Logout function
-//   const logout = async () => {
-//     console.log('🔓 Logout function called'); // Debug log
-//     try {
-//       // Check what's in storage before removal
-//       const beforeRemoval = await AsyncStorage.getItem('user');
-//       console.log('📦 Data in AsyncStorage before removal:', beforeRemoval);
-
-//       // Remove user data from AsyncStorage
-//       await AsyncStorage.removeItem('user');
-//       console.log('🗑️ AsyncStorage.removeItem() completed');
-
-//       // Verify removal
-//       const afterRemoval = await AsyncStorage.getItem('user');
-//       console.log('📦 Data in AsyncStorage after removal:', afterRemoval);
-
-//       // Update state
-//       setUser(null);
-//       setIsAuthenticated(false);
-//       setAuthKey(prev => prev + 1); // Force complete re-render
-//       console.log('✅ Authentication state cleared - isAuthenticated: false, user: null');
-
-//       // Force a small delay to ensure state updates are processed
-//       await new Promise(resolve => setTimeout(resolve, 100));
-//       console.log('⏱️ State update delay completed');
-
-//     } catch (error) {
-//       console.error('❌ Logout error:', error);
-//       // Even if there's an error, we should still log out locally
-//       setUser(null);
-//       setIsAuthenticated(false);
-//       console.log('🔄 Fallback logout completed');
-//     }
-//   };
-
-//   // Debug function to clear all storage (for testing)
-//   const clearStorage = async () => {
-//     try {
-//       await AsyncStorage.clear();
-//       console.log('All AsyncStorage cleared');
-//       setUser(null);
-//       setIsAuthenticated(false);
-//     } catch (error) {
-//       console.error('Error clearing storage:', error);
-//     }
-//   };
-
-//   // Check if user is admin
-//   const isAdmin = () => {
-//     return user?.role === 'admin';
-//   };
-
-//   // Check if user has specific role
-//   const hasRole = (role) => {
-//     return user?.role === role;
-//   };
-
-//   const value = {
-//     isAuthenticated,
-//     user,
-//     isLoading,
-//     authKey,
-//     login,
-//     logout,
-//     clearStorage,
-//     isAdmin,
-//     hasRole
-//   };
-
-//   return (
-//     <AuthContext.Provider value={value}>
-//       {children}
-//     </AuthContext.Provider>
-//   );
-// };
-
-// // Custom hook to use the Auth Context
-// export const useAuth = () => {
-//   const context = useContext(AuthContext);
-//   if (!context) {
-//     throw new Error('useAuth must be used within an AuthProvider');
-//   }
-//   return context;
-// };
-
-// export default AuthContext;
