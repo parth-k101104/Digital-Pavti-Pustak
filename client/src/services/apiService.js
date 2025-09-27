@@ -12,6 +12,13 @@ const ENDPOINTS = {
   USERS: '/auth/users',
   HEALTH: '/health',
   INFO: '/info',
+  // Donation endpoints
+  DONATIONS: '/donations',
+  DONATIONS_BY_YEAR: '/donations',
+  DONATIONS_ALL: '/donations/all',
+  DONATIONS_YEARS: '/donations/years',
+  DONATIONS_STATS: '/donations',
+  DONATIONS_HEALTH: '/donations/health',
 };
 
 /**
@@ -216,6 +223,72 @@ class ApiService {
       console.error('Backend availability check failed:', error);
       return false;
     }
+  }
+
+  // ===== DONATION API METHODS =====
+
+  /**
+   * Create a new donation
+   */
+  async createDonation(donationData) {
+    return this.makeRequest(ENDPOINTS.DONATIONS, {
+      method: 'POST',
+      body: JSON.stringify(donationData),
+    });
+  }
+
+  /**
+   * Get donations for a specific year
+   */
+  async getDonationsByYear(year) {
+    return this.makeRequest(`${ENDPOINTS.DONATIONS_BY_YEAR}/${year}`);
+  }
+
+  /**
+   * Get all donations (admin only)
+   */
+  async getAllDonations() {
+    return this.makeRequest(ENDPOINTS.DONATIONS_ALL);
+  }
+
+  /**
+   * Update a donation (admin only)
+   */
+  async updateDonation(year, donationId, donationData) {
+    return this.makeRequest(`${ENDPOINTS.DONATIONS}/${year}/${donationId}`, {
+      method: 'PUT',
+      body: JSON.stringify(donationData),
+    });
+  }
+
+  /**
+   * Delete a donation (admin only)
+   */
+  async deleteDonation(year, donationId) {
+    return this.makeRequest(`${ENDPOINTS.DONATIONS}/${year}/${donationId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Get available years with donation data
+   */
+  async getAvailableYears() {
+    return this.makeRequest(ENDPOINTS.DONATIONS_YEARS);
+  }
+
+  /**
+   * Get statistics for a specific year
+   */
+  async getYearStats(year) {
+    return this.makeRequest(`${ENDPOINTS.DONATIONS_STATS}/${year}/stats`);
+  }
+
+  /**
+   * Check donation service health
+   */
+  async checkDonationHealth() {
+    return this.makeRequest(ENDPOINTS.DONATIONS_HEALTH);
   }
 }
 
