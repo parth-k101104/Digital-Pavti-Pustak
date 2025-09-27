@@ -18,17 +18,17 @@ import java.util.function.Function;
 @Service
 @Slf4j
 public class JwtService {
-    
+
     @Value("${app.jwt.secret:mySecretKey}")
     private String jwtSecret;
-    
+
     @Value("${app.jwt.expiration:86400000}")
     private long jwtExpiration;
-    
+
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes());
     }
-    
+
     /**
      * Generate JWT token for user
      */
@@ -36,18 +36,20 @@ public class JwtService {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("role", user.getRole().getValue());
-        claims.put("username", user.getUsername());
-        
-        return createToken(claims, user.getUsername());
+        claims.put("firstName", user.getFirstName());
+        claims.put("lastName", user.getLastName());
+        claims.put("fullName", user.getFirstName() + "_" + user.getLastName());
+
+        return createToken(claims, user.getFirstName() + "_" + user.getLastName());
     }
-    
+
     /**
      * Create JWT token with claims
      */
     private String createToken(Map<String, Object> claims, String subject) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
-        
+
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
@@ -56,35 +58,49 @@ public class JwtService {
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
     }
-    
+
     /**
-     * Extract username from token
+     * Extract fullName (firstName_lastName) from token
      */
-    public String extractUsername(String token) {
+    public String extractFullName(String token) {
         return extractClaim(token, Claims::getSubject);
     }
-    
+
+    /**
+     * Extract firstName from token
+     */
+    public String extractFirstName(String token) {
+        return extractClaim(token, claims -> (String) claims.get("firstName"));
+    }
+
+    /**
+     * Extract lastName from token
+     */
+    public String extractLastName(String token) {
+        return extractClaim(token, claims -> (String) claims.get("lastName"));
+    }
+
     /**
      * Extract user ID from token
      */
     public Long extractUserId(String token) {
         return extractClaim(token, claims -> claims.get("userId", Long.class));
     }
-    
+
     /**
      * Extract role from token
      */
     public String extractRole(String token) {
         return extractClaim(token, claims -> claims.get("role", String.class));
     }
-    
+
     /**
      * Extract expiration date from token
      */
     public Date extractExpiration(String token) {
         return extractClaim(token, Claims::getExpiration);
     }
-    
+
     /**
      * Extract specific claim from token
      */
@@ -92,7 +108,7 @@ public class JwtService {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
     }
-    
+
     /**
      * Extract all claims from token
      */
@@ -108,7 +124,7 @@ public class JwtService {
             throw new RuntimeException("Invalid JWT token");
         }
     }
-    
+
     /**
      * Check if token is expired
      */
@@ -119,14 +135,14 @@ public class JwtService {
             return true;
         }
     }
-    
+
     /**
      * Validate token
      */
-    public Boolean validateToken(String token, String username) {
+    public Boolean validateToken(String token, String fullName) {
         try {
-            final String extractedUsername = extractUsername(token);
-            return (extractedUsername.equals(username) && !isTokenExpired(token));
+            final String extractedFullName = extractFullName(token);
+            return (extractedFullName.equals(fullName) && !isTokenExpired(token));
         } catch (Exception e) {
             log.error("Token validation failed", e);
             return false;

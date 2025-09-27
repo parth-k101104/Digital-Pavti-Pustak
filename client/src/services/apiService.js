@@ -140,12 +140,12 @@ class ApiService {
   }
 
   /**
-   * User login
+   * User login with firstName_lastName format
    */
-  async login(username, password) {
+  async login(name, password) {
     return this.makeRequest(ENDPOINTS.LOGIN, {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ name, password }),
       skipAuth: true,
     });
   }

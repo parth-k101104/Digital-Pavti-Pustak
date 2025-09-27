@@ -9,19 +9,23 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LoginResponse {
-    
+
     private String token;
-    private String username;
+    private String firstName;
+    private String lastName;
+    private String fullName; // firstName_lastName format
     private User.Role role;
     private String redirectTo;
     private String message;
     private boolean success;
-    
-    public static LoginResponse success(String token, String username, User.Role role, String redirectTo) {
-        return new LoginResponse(token, username, role, redirectTo, "Login successful", true);
+
+    public static LoginResponse success(String token, String firstName, String lastName, User.Role role,
+            String redirectTo) {
+        String fullName = firstName + "_" + lastName;
+        return new LoginResponse(token, firstName, lastName, fullName, role, redirectTo, "Login successful", true);
     }
-    
+
     public static LoginResponse failure(String message) {
-        return new LoginResponse(null, null, null, null, message, false);
+        return new LoginResponse(null, null, null, null, null, null, message, false);
     }
 }
