@@ -18,7 +18,7 @@ import { createFadeInAnimation, createSlideInAnimation } from '../utils/animatio
 import colors from '../styles/colors';
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -40,18 +40,35 @@ export default function LoginScreen() {
     ]).start();
   }, [fadeAnim, slideAnim, formFadeAnim]);
 
+  const validateNameFormat = (name) => {
+    if (!name || !name.includes('_')) {
+      return false;
+    }
+    const parts = name.split('_');
+    return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+  };
+
   const handleLogin = async () => {
     // Basic validation
-    if (!username.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both username and password');
+    if (!name.trim() || !password.trim()) {
+      Alert.alert('Error', 'Please enter both name and password');
+      return;
+    }
+
+    // Validate name format
+    if (!validateNameFormat(name.trim())) {
+      Alert.alert(
+        'Invalid Name Format',
+        'Please enter your name in the format "FirstName_LastName"\n\nExample: "John_Doe"'
+      );
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
-      const result = await login(username.trim(), password);
-      
+      const result = await login(name.trim(), password);
+
       if (!result.success) {
         Alert.alert('Login Failed', result.error);
       }
@@ -66,7 +83,7 @@ export default function LoginScreen() {
   const showDemoCredentials = () => {
     Alert.alert(
       'Demo Credentials',
-      'Admin Users:\n• Username: admin\n  Password: admin123\n• Username: demo_admin\n  Password: demo123\n\nRegular Users:\n• Username: user\n  Password: user123\n• Username: demo_user\n  Password: demo123',
+      'Admin Users:\n• Name: System_Administrator\n  Password: admin123\n• Name: Demo_Admin\n  Password: demo123\n\nRegular Users:\n• Name: Regular_User\n  Password: user123\n• Name: Demo_User\n  Password: demo123\n\nNote: Use format "FirstName_LastName"',
       [{ text: 'OK' }]
     );
   };
@@ -74,8 +91,8 @@ export default function LoginScreen() {
 
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -90,14 +107,14 @@ export default function LoginScreen() {
           <Animated.View style={[styles.form, { opacity: formFadeAnim }]}>
             <Text style={styles.formTitle}>Login to Continue</Text>
 
-            {/* Username Input */}
+            {/* Name Input */}
             <View style={styles.inputContainer}>
               <Ionicons name="person-outline" size={20} color={colors.textLight} style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Username"
-                value={username}
-                onChangeText={setUsername}
+                placeholder="Name (FirstName_LastName)"
+                value={name}
+                onChangeText={setName}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isLoading}
@@ -248,5 +265,12 @@ const styles = StyleSheet.create({
   demoButton: {
     marginTop: 20,
     alignSelf: 'center',
+  },
+  helperText: {
+    fontSize: 12,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginBottom: 16,
+    fontStyle: 'italic',
   },
 });

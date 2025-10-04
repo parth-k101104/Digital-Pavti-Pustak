@@ -46,10 +46,10 @@ Successfully implemented a comprehensive Spring Boot backend with database integ
 
 ### 6. Database Initialization
 - **Default Users**: Automatically created on startup
-  - `admin/admin123` (ADMIN role)
-  - `user/user123` (USER role)
-  - `demo_admin/demo123` (ADMIN role)
-  - `demo_user/demo123` (USER role)
+  - `System_Administrator/admin123` (ADMIN role)
+  - `Regular_User/user123` (USER role)
+  - `Demo_Admin/demo123` (ADMIN role)
+  - `Demo_User/demo123` (USER role)
 
 ### 7. Error Handling & Validation
 - **Global Exception Handler**: Centralized error management
@@ -168,12 +168,14 @@ const login = async (username, password) => {
 
 ## 📊 Default Test Data
 
-| Username | Password | Role | Redirect To |
-|----------|----------|------|-------------|
-| admin | admin123 | ADMIN | HomePage |
-| user | user123 | USER | DonationsPage |
-| demo_admin | demo123 | ADMIN | HomePage |
-| demo_user | demo123 | USER | DonationsPage |
+| Name | Password | Role | Redirect To |
+|------|----------|------|-------------|
+| System_Administrator | admin123 | ADMIN | HomePage |
+| Regular_User | user123 | USER | DonationsPage |
+| Demo_Admin | demo123 | ADMIN | HomePage |
+| Demo_User | demo123 | USER | DonationsPage |
+
+**Note**: Login format is `firstName_lastName` (e.g., `System_Administrator`)
 
 ## 🎉 Success Metrics
 

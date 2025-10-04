@@ -11,46 +11,52 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
-    
+
     /**
-     * Find user by username for authentication
+     * Find user by firstName and lastName for authentication
      */
-    Optional<User> findByUsername(String username);
-    
+    Optional<User> findByFirstNameAndLastName(String firstName, String lastName);
+
     /**
-     * Find user by email
+     * Find active user by firstName and lastName for authentication
      */
-    Optional<User> findByEmail(String email);
-    
+    @Query("SELECT u FROM User u WHERE u.firstName = :firstName AND u.lastName = :lastName AND u.isActive = true")
+    Optional<User> findActiveUserByFirstNameAndLastName(@Param("firstName") String firstName,
+            @Param("lastName") String lastName);
+
     /**
-     * Check if username exists
+     * Check if firstName and lastName combination exists
      */
-    boolean existsByUsername(String username);
-    
+    boolean existsByFirstNameAndLastName(String firstName, String lastName);
+
     /**
-     * Check if email exists
+     * Check if phone number exists
      */
-    boolean existsByEmail(String email);
-    
+    boolean existsByPhoneNumber(String phoneNumber);
+
     /**
      * Find all active users
      */
     List<User> findByIsActiveTrue();
-    
+
     /**
      * Find users by role
      */
     List<User> findByRole(User.Role role);
-    
+
     /**
      * Find active users by role
      */
     @Query("SELECT u FROM User u WHERE u.role = :role AND u.isActive = true")
     List<User> findActiveUsersByRole(@Param("role") User.Role role);
-    
+
     /**
-     * Find user by username and active status for authentication
+     * Find users by firstName (for partial matching)
      */
-    @Query("SELECT u FROM User u WHERE u.username = :username AND u.isActive = true")
-    Optional<User> findActiveUserByUsername(@Param("username") String username);
+    List<User> findByFirstNameContainingIgnoreCase(String firstName);
+
+    /**
+     * Find users by lastName (for partial matching)
+     */
+    List<User> findByLastNameContainingIgnoreCase(String lastName);
 }

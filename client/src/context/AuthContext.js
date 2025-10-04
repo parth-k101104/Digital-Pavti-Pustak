@@ -33,9 +33,11 @@ export const AuthProvider = ({ children }) => {
         if (result.success && result.data?.valid) {
           console.log('✅ Token valid, restoring user session');
           const userData = {
-            username: result.data.username,
+            fullName: result.data.fullName,
+            firstName: result.data.firstName,
+            lastName: result.data.lastName,
             role: result.data.role,
-            name: result.data.username, // Use username as display name for now
+            name: `${result.data.firstName} ${result.data.lastName}`, // Display name
             redirectTo: result.data.redirectTo,
           };
 
@@ -55,10 +57,18 @@ export const AuthProvider = ({ children }) => {
     restoreUser();
   }, []);
 
-  // Login
-  const login = async (username, password) => {
+  // Login with firstName_lastName format
+  const login = async (name, password) => {
     try {
-      console.log('🔐 Attempting login for:', username);
+      console.log('🔐 Attempting login for:', name);
+
+      // Validate name format
+      if (!name || !name.includes('_') || name.split('_').length !== 2) {
+        return {
+          success: false,
+          error: 'Please enter name in format "FirstName_LastName" (e.g., "John_Doe")'
+        };
+      }
 
       // Check if backend is available
       if (!backendAvailable) {
@@ -73,7 +83,7 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      const result = await apiService.login(username, password);
+      const result = await apiService.login(name, password);
 
       if (result.success && result.data?.success) {
         const loginData = result.data;
@@ -84,9 +94,11 @@ export const AuthProvider = ({ children }) => {
 
         // Create user object
         const userData = {
-          username: loginData.username,
+          fullName: loginData.fullName,
+          firstName: loginData.firstName,
+          lastName: loginData.lastName,
           role: loginData.role,
-          name: loginData.username, // Use username as display name
+          name: `${loginData.firstName} ${loginData.lastName}`, // Display name
           redirectTo: loginData.redirectTo,
         };
 
@@ -100,7 +112,7 @@ export const AuthProvider = ({ children }) => {
           redirectTo: loginData.redirectTo
         };
       } else {
-        const errorMessage = result.data?.message || result.error || 'Invalid username or password';
+        const errorMessage = result.data?.message || result.error || 'Invalid name or password';
         console.log('❌ Login failed:', errorMessage);
         return { success: false, error: errorMessage };
       }

@@ -18,48 +18,57 @@ import java.util.Optional;
 @Slf4j
 @Transactional
 public class UserService {
-    
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    
+
     /**
      * Authenticate user and return login response with role-based routing
      */
     public LoginResponse authenticateUser(LoginRequest loginRequest) {
         try {
-            log.debug("Attempting to authenticate user: {}", loginRequest.getUsername());
-            
-            Optional<User> userOptional = userRepository.findActiveUserByUsername(loginRequest.getUsername());
-            
+            // Validate name format
+            if (!loginRequest.isValidNameFormat()) {
+                log.warn("Invalid name format provided: {}", loginRequest.getName());
+                return LoginResponse.failure("Invalid name format. Please use 'firstName_lastName' format.");
+            }
+
+            String firstName = loginRequest.getFirstName();
+            String lastName = loginRequest.getLastName();
+
+            log.debug("Attempting to authenticate user: {}_{}", firstName, lastName);
+
+            Optional<User> userOptional = userRepository.findActiveUserByFirstNameAndLastName(firstName, lastName);
+
             if (userOptional.isEmpty()) {
-                log.warn("User not found or inactive: {}", loginRequest.getUsername());
-                return LoginResponse.failure("Invalid username or password");
+                log.warn("User not found or inactive: {}_{}", firstName, lastName);
+                return LoginResponse.failure("Invalid name or password");
             }
-            
+
             User user = userOptional.get();
-            
+
             if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
-                log.warn("Invalid password for user: {}", loginRequest.getUsername());
-                return LoginResponse.failure("Invalid username or password");
+                log.warn("Invalid password for user: {}_{}", firstName, lastName);
+                return LoginResponse.failure("Invalid name or password");
             }
-            
+
             // Generate JWT token
             String token = jwtService.generateToken(user);
-            
+
             // Determine redirect based on role
             String redirectTo = determineRedirectPath(user.getRole());
-            
-            log.info("User authenticated successfully: {} with role: {}", user.getUsername(), user.getRole());
-            
-            return LoginResponse.success(token, user.getUsername(), user.getRole(), redirectTo);
-            
+
+            log.info("User authenticated successfully: {}_{} with role: {}", firstName, lastName, user.getRole());
+
+            return LoginResponse.success(token, firstName, lastName, user.getRole(), redirectTo);
+
         } catch (Exception e) {
-            log.error("Error during authentication for user: {}", loginRequest.getUsername(), e);
+            log.error("Error during authentication for user: {}", loginRequest.getName(), e);
             return LoginResponse.failure("Authentication failed. Please try again.");
         }
     }
-    
+
     /**
      * Determine redirect path based on user role
      */
@@ -69,38 +78,43 @@ public class UserService {
             case USER -> "DonationsPage";
         };
     }
-    
+
     /**
      * Create a new user with encrypted password
      */
     public User createUser(User user) {
-        log.debug("Creating new user: {}", user.getUsername());
-        
-        if (userRepository.existsByUsername(user.getUsername())) {
-            throw new RuntimeException("Username already exists: " + user.getUsername());
+        log.debug("Creating new user: {}_{}", user.getFirstName(), user.getLastName());
+
+        if (userRepository.existsByFirstNameAndLastName(user.getFirstName(), user.getLastName())) {
+            throw new RuntimeException("User already exists: " + user.getFirstName() + "_" + user.getLastName());
         }
-        
-        if (user.getEmail() != null && userRepository.existsByEmail(user.getEmail())) {
-            throw new RuntimeException("Email already exists: " + user.getEmail());
+
+        if (user.getPhoneNumber() != null && userRepository.existsByPhoneNumber(user.getPhoneNumber())) {
+            throw new RuntimeException("Phone number already exists: " + user.getPhoneNumber());
         }
-        
+
         // Encrypt password
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        
+
+        // Set default values
+        if (user.getIsActive() == null) {
+            user.setIsActive(true);
+        }
+
         User savedUser = userRepository.save(user);
-        log.info("User created successfully: {}", savedUser.getUsername());
-        
+        log.info("User created successfully: {}_{}", savedUser.getFirstName(), savedUser.getLastName());
+
         return savedUser;
     }
-    
+
     /**
-     * Find user by username
+     * Find user by firstName and lastName
      */
     @Transactional(readOnly = true)
-    public Optional<User> findByUsername(String username) {
-        return userRepository.findByUsername(username);
+    public Optional<User> findByFirstNameAndLastName(String firstName, String lastName) {
+        return userRepository.findByFirstNameAndLastName(firstName, lastName);
     }
-    
+
     /**
      * Get all active users
      */
@@ -108,7 +122,7 @@ public class UserService {
     public List<User> getAllActiveUsers() {
         return userRepository.findByIsActiveTrue();
     }
-    
+
     /**
      * Get users by role
      */
@@ -116,30 +130,30 @@ public class UserService {
     public List<User> getUsersByRole(User.Role role) {
         return userRepository.findActiveUsersByRole(role);
     }
-    
+
     /**
-     * Deactivate user
+     * Deactivate user by firstName and lastName
      */
-    public void deactivateUser(String username) {
-        Optional<User> userOptional = userRepository.findByUsername(username);
+    public void deactivateUser(String firstName, String lastName) {
+        Optional<User> userOptional = userRepository.findByFirstNameAndLastName(firstName, lastName);
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             user.setIsActive(false);
             userRepository.save(user);
-            log.info("User deactivated: {}", username);
+            log.info("User deactivated: {}_{}", firstName, lastName);
         }
     }
-    
+
     /**
-     * Update user password
+     * Update user password by firstName and lastName
      */
-    public void updatePassword(String username, String newPassword) {
-        Optional<User> userOptional = userRepository.findByUsername(username);
+    public void updatePassword(String firstName, String lastName, String newPassword) {
+        Optional<User> userOptional = userRepository.findByFirstNameAndLastName(firstName, lastName);
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             user.setPassword(passwordEncoder.encode(newPassword));
             userRepository.save(user);
-            log.info("Password updated for user: {}", username);
+            log.info("Password updated for user: {}_{}", firstName, lastName);
         }
     }
 }

@@ -22,45 +22,44 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
-    
+
     private final JwtService jwtService;
-    
+
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, 
-                                    FilterChain filterChain) throws ServletException, IOException {
-        
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
+
         try {
             String jwt = getJwtFromRequest(request);
-            
+
             if (StringUtils.hasText(jwt)) {
-                String username = jwtService.extractUsername(jwt);
+                String fullName = jwtService.extractFullName(jwt);
                 String role = jwtService.extractRole(jwt);
-                
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    if (jwtService.validateToken(jwt, username)) {
-                        
+
+                if (fullName != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    if (jwtService.validateToken(jwt, fullName)) {
+
                         // Create authorities based on role
                         List<SimpleGrantedAuthority> authorities = List.of(
-                            new SimpleGrantedAuthority("ROLE_" + role)
-                        );
-                        
-                        UsernamePasswordAuthenticationToken authentication = 
-                            new UsernamePasswordAuthenticationToken(username, null, authorities);
+                                new SimpleGrantedAuthority("ROLE_" + role));
+
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                fullName, null, authorities);
                         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                        
+
                         SecurityContextHolder.getContext().setAuthentication(authentication);
-                        
-                        log.debug("Set authentication for user: {} with role: {}", username, role);
+
+                        log.debug("Set authentication for user: {} with role: {}", fullName, role);
                     }
                 }
             }
         } catch (Exception ex) {
             log.error("Could not set user authentication in security context", ex);
         }
-        
+
         filterChain.doFilter(request, response);
     }
-    
+
     private String getJwtFromRequest(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {

@@ -27,19 +27,19 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("test")
 @Transactional
 public class AuthControllerTest {
-    
+
     @Autowired
     private WebApplicationContext context;
-    
+
     @Autowired
     private UserRepository userRepository;
-    
+
     @Autowired
     private PasswordEncoder passwordEncoder;
-    
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
-    
+
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
@@ -47,18 +47,20 @@ public class AuthControllerTest {
                 .apply(springSecurity())
                 .build();
         objectMapper = new ObjectMapper();
-        
+
         // Create test user
-        if (!userRepository.existsByUsername("testuser")) {
+        if (!userRepository.existsByFirstNameAndLastName("Test", "User")) {
             User testUser = new User();
-            testUser.setUsername("testuser");
+            testUser.setFirstName("Test");
+            testUser.setLastName("User");
             testUser.setPassword(passwordEncoder.encode("testpass"));
             testUser.setRole(User.Role.USER);
+            testUser.setPhoneNumber("1234567890");
             testUser.setIsActive(true);
             userRepository.save(testUser);
         }
     }
-    
+
     @Test
     void testHealthEndpoint() throws Exception {
         mockMvc.perform(get("/api/health"))
@@ -66,41 +68,55 @@ public class AuthControllerTest {
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.status").value("UP"));
     }
-    
+
     @Test
     void testSuccessfulLogin() throws Exception {
-        LoginRequest loginRequest = new LoginRequest("testuser", "testpass");
-        
+        LoginRequest loginRequest = new LoginRequest("Test_User", "testpass");
+
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.username").value("testuser"))
+                .andExpect(jsonPath("$.fullName").value("Test_User"))
+                .andExpect(jsonPath("$.firstName").value("Test"))
+                .andExpect(jsonPath("$.lastName").value("User"))
                 .andExpect(jsonPath("$.role").value("USER"))
                 .andExpect(jsonPath("$.redirectTo").value("DonationsPage"))
                 .andExpect(jsonPath("$.token").exists());
     }
-    
+
     @Test
     void testFailedLogin() throws Exception {
-        LoginRequest loginRequest = new LoginRequest("testuser", "wrongpass");
-        
+        LoginRequest loginRequest = new LoginRequest("Test_User", "wrongpass");
+
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Invalid username or password"));
+                .andExpect(jsonPath("$.message").value("Invalid name or password"));
     }
-    
+
     @Test
     void testLoginWithInvalidData() throws Exception {
         LoginRequest loginRequest = new LoginRequest("", "");
-        
+
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(loginRequest)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testLoginWithInvalidNameFormat() throws Exception {
+        LoginRequest loginRequest = new LoginRequest("InvalidFormat", "testpass");
+
+        mockMvc.perform(post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(loginRequest)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.message").value("Invalid name format. Please use 'firstName_lastName' format."));
     }
 }

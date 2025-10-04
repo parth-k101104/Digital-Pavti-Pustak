@@ -16,13 +16,15 @@ try {
 Write-Host "`n2. Testing Admin Login..." -ForegroundColor Yellow
 try {
     $adminLoginBody = @{
-        username = "admin"
+        name = "System_Administrator"
         password = "admin123"
     } | ConvertTo-Json
 
     $adminResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" -Method POST -ContentType "application/json" -Body $adminLoginBody
     Write-Host "✅ Admin Login: Success" -ForegroundColor Green
-    Write-Host "   Username: $($adminResponse.username)" -ForegroundColor Cyan
+    Write-Host "   Full Name: $($adminResponse.fullName)" -ForegroundColor Cyan
+    Write-Host "   First Name: $($adminResponse.firstName)" -ForegroundColor Cyan
+    Write-Host "   Last Name: $($adminResponse.lastName)" -ForegroundColor Cyan
     Write-Host "   Role: $($adminResponse.role)" -ForegroundColor Cyan
     Write-Host "   Redirect To: $($adminResponse.redirectTo)" -ForegroundColor Cyan
     $adminToken = $adminResponse.token
@@ -34,13 +36,15 @@ try {
 Write-Host "`n3. Testing User Login..." -ForegroundColor Yellow
 try {
     $userLoginBody = @{
-        username = "user"
+        name = "Regular_User"
         password = "user123"
     } | ConvertTo-Json
 
     $userResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" -Method POST -ContentType "application/json" -Body $userLoginBody
     Write-Host "✅ User Login: Success" -ForegroundColor Green
-    Write-Host "   Username: $($userResponse.username)" -ForegroundColor Cyan
+    Write-Host "   Full Name: $($userResponse.fullName)" -ForegroundColor Cyan
+    Write-Host "   First Name: $($userResponse.firstName)" -ForegroundColor Cyan
+    Write-Host "   Last Name: $($userResponse.lastName)" -ForegroundColor Cyan
     Write-Host "   Role: $($userResponse.role)" -ForegroundColor Cyan
     Write-Host "   Redirect To: $($userResponse.redirectTo)" -ForegroundColor Cyan
     $userToken = $userResponse.token
@@ -68,7 +72,7 @@ if ($adminToken) {
 Write-Host "`n5. Testing Invalid Login..." -ForegroundColor Yellow
 try {
     $invalidLoginBody = @{
-        username = "invalid"
+        name = "Invalid_User"
         password = "invalid"
     } | ConvertTo-Json
 
@@ -78,9 +82,23 @@ try {
     Write-Host "✅ Invalid Login: Correctly rejected" -ForegroundColor Green
 }
 
+# Test invalid name format
+Write-Host "`n6. Testing Invalid Name Format..." -ForegroundColor Yellow
+try {
+    $invalidFormatBody = @{
+        name = "InvalidFormat"
+        password = "password"
+    } | ConvertTo-Json
+
+    $invalidFormatResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/auth/login" -Method POST -ContentType "application/json" -Body $invalidFormatBody
+    Write-Host "❌ Invalid Format: Should have failed but didn't" -ForegroundColor Red
+} catch {
+    Write-Host "✅ Invalid Format: Correctly rejected" -ForegroundColor Green
+}
+
 Write-Host "`n🎉 API Testing Complete!" -ForegroundColor Green
 Write-Host "`nDefault Users:" -ForegroundColor Yellow
-Write-Host "  Admin: admin/admin123 → HomePage" -ForegroundColor Cyan
-Write-Host "  User: user/user123 → DonationsPage" -ForegroundColor Cyan
-Write-Host "  Demo Admin: demo_admin/demo123 → HomePage" -ForegroundColor Cyan
-Write-Host "  Demo User: demo_user/demo123 → DonationsPage" -ForegroundColor Cyan
+Write-Host "  Admin: System_Administrator/admin123 → HomePage" -ForegroundColor Cyan
+Write-Host "  User: Regular_User/user123 → DonationsPage" -ForegroundColor Cyan
+Write-Host "  Demo Admin: Demo_Admin/demo123 → HomePage" -ForegroundColor Cyan
+Write-Host "  Demo User: Demo_User/demo123 → DonationsPage" -ForegroundColor Cyan
