@@ -1,13 +1,15 @@
 import React from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../context/AuthContext';
 import HomePage from '../screens/HomePage';
 import DonationsPage from '../screens/DonationsPage';
+import DonationListScreen from '../screens/DonationListScreen';
 import colors from '../styles/colors';
+import ManageUserScreen from '../screens/ManageUserScreen';
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -17,9 +19,9 @@ function CustomDrawerContent({ navigation, state }) {
   const { user, logout, isAdmin } = useAuth();
 
   const handleLogout = () => {
-  console.log("Logout button pressed directly"); 
-  logout();
-};
+    console.log("Logout button pressed directly");
+    logout();
+  };
 
   const isActiveRoute = (routeName) => {
     const currentRoute = state.routes[state.index];
@@ -28,89 +30,144 @@ function CustomDrawerContent({ navigation, state }) {
 
   return (
     <View style={styles.drawerContainer}>
-      {/* Header */}
-      <View style={styles.drawerHeader}>
-        <View style={styles.userInfo}>
-          <Ionicons name="person-circle" size={50} color={colors.primary} />
-          <Text style={styles.userName}>{user?.name}</Text>
-          <Text style={styles.userRole}>{user?.role?.toUpperCase()}</Text>
+      {/* Scrollable Section */}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Header */}
+        <View style={styles.drawerHeader}>
+          <View style={styles.userInfo}>
+            <Ionicons name="person-circle" size={50} color={colors.cardBg} />
+            <Text style={styles.userName}>{user?.name}</Text>
+            <Text style={styles.userRole}>{user?.role?.toUpperCase()}</Text>
+          </View>
         </View>
-      </View>
 
-      {/* Navigation Items */}
-      <View style={styles.drawerItems}>
-        {isAdmin() && (
+        {/* Navigation Items */}
+        <View style={styles.drawerItems}>
+          {/* Admin-only: Dashboard */}
+          {isAdmin() && (
+            <TouchableOpacity
+              style={[
+                styles.drawerItem,
+                isActiveRoute('Home') && styles.drawerItemActive
+              ]}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <Ionicons
+                name={isActiveRoute('Home') ? "home" : "home-outline"}
+                size={24}
+                color={isActiveRoute('Home') ? colors.primary : colors.textDark}
+              />
+              <Text
+                style={[
+                  styles.drawerItemText,
+                  isActiveRoute('Home') && styles.drawerItemTextActive
+                ]}
+              >
+                Dashboard
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* All users: Donations */}
           <TouchableOpacity
             style={[
               styles.drawerItem,
-              isActiveRoute('Home') && styles.drawerItemActive
+              isActiveRoute('Donations') && styles.drawerItemActive
             ]}
-            onPress={() => navigation.navigate('Home')}
+            onPress={() => navigation.navigate('Donations')}
           >
             <Ionicons
-              name={isActiveRoute('Home') ? "home" : "home-outline"}
+              name={isActiveRoute('Donations') ? "heart" : "heart-outline"}
               size={24}
-              color={isActiveRoute('Home') ? colors.primary : colors.textDark}
+              color={isActiveRoute('Donations') ? colors.primary : colors.textDark}
             />
-            <Text style={[
-              styles.drawerItemText,
-              isActiveRoute('Home') && styles.drawerItemTextActive
-            ]}>
-              Dashboard
+            <Text
+              style={[
+                styles.drawerItemText,
+                isActiveRoute('Donations') && styles.drawerItemTextActive
+              ]}
+            >
+              Donations
             </Text>
           </TouchableOpacity>
-        )}
 
-        <TouchableOpacity
-          style={[
-            styles.drawerItem,
-            isActiveRoute('Donations') && styles.drawerItemActive
-          ]}
-          onPress={() => navigation.navigate('Donations')}
-        >
-          <Ionicons
-            name={isActiveRoute('Donations') ? "heart" : "heart-outline"}
-            size={24}
-            color={isActiveRoute('Donations') ? colors.primary : colors.textDark}
-          />
-          <Text style={[
-            styles.drawerItemText,
-            isActiveRoute('Donations') && styles.drawerItemTextActive
-          ]}>
-            Donations
-          </Text>
-        </TouchableOpacity>
-
-        {/* Add more navigation items based on role */}
-        {isAdmin() && (
-          <>
-            <TouchableOpacity style={styles.drawerItem}>
-              <Ionicons name="people-outline" size={24} color={colors.textDark} />
-              <Text style={styles.drawerItemText}>Manage Users</Text>
+          {/* ✅ Admin-only: Donation List */}
+          {isAdmin() && (
+            <TouchableOpacity
+              style={[
+                styles.drawerItem,
+                isActiveRoute('DonationList') && styles.drawerItemActive
+              ]}
+              onPress={() => navigation.navigate('DonationList')}
+            >
+              <Ionicons
+                name={isActiveRoute('DonationList') ? "list" : "list-outline"}
+                size={24}
+                color={isActiveRoute('DonationList') ? colors.primary : colors.textDark}
+              />
+              <Text
+                style={[
+                  styles.drawerItemText,
+                  isActiveRoute('DonationList') && styles.drawerItemTextActive
+                ]}
+              >
+                Donation List
+              </Text>
             </TouchableOpacity>
+          )}
 
+          {/* Admin-only extra items */}
+          {isAdmin() && (
+            <>
+              <TouchableOpacity
+                style={[
+                  styles.drawerItem,
+                  isActiveRoute('ManagerUser') && styles.drawerItemActive
+                ]}
+                onPress={() => navigation.navigate('ManageUser')}
+              >
+                <Ionicons
+                  name={isActiveRoute('ManageUser') ? "people" : "people-outline"}
+                  size={24}
+                  color={isActiveRoute('ManageUser') ? colors.primary : colors.textDark}
+                />
+                <Text
+                  style={[
+                   styles.drawerItemText,
+                    isActiveRoute('ManageUser') && styles.drawerItemTextActive
+                  ]}
+                >
+                  Manage Users
+                </Text>
+              </TouchableOpacity>
+              {/* <TouchableOpacity style={styles.drawerItem}>
+                <Ionicons name="people-outline" size={24} color={colors.textDark} />
+                <Text style={styles.drawerItemText}>Manage Users</Text>
+              </TouchableOpacity> */}
+
+              <TouchableOpacity style={styles.drawerItem}>
+                <Ionicons name="analytics-outline" size={24} color={colors.textDark} />
+                <Text style={styles.drawerItemText}>Reports</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.drawerItem}>
+                <Ionicons name="settings-outline" size={24} color={colors.textDark} />
+                <Text style={styles.drawerItemText}>Settings</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {/* User-only item */}
+          {!isAdmin() && (
             <TouchableOpacity style={styles.drawerItem}>
-              <Ionicons name="analytics-outline" size={24} color={colors.textDark} />
-              <Text style={styles.drawerItemText}>Reports</Text>
+              <Ionicons name="person-outline" size={24} color={colors.textDark} />
+              <Text style={styles.drawerItemText}>My Profile</Text>
             </TouchableOpacity>
+          )}
+        </View>
+      </ScrollView>
 
-            <TouchableOpacity style={styles.drawerItem}>
-              <Ionicons name="settings-outline" size={24} color={colors.textDark} />
-              <Text style={styles.drawerItemText}>Settings</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {/* User-specific items */}
-        {!isAdmin() && (
-          <TouchableOpacity style={styles.drawerItem}>
-            <Ionicons name="person-outline" size={24} color={colors.textDark} />
-            <Text style={styles.drawerItemText}>My Profile</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Logout Button */}
+      {/* Fixed Logout Button */}
       <View style={styles.drawerFooter}>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={24} color={colors.danger} />
@@ -121,7 +178,7 @@ function CustomDrawerContent({ navigation, state }) {
   );
 }
 
-// Admin Drawer Navigator (Full Access)
+// Admin Drawer Navigator
 function AdminDrawerNavigator() {
   return (
     <Drawer.Navigator
@@ -141,11 +198,13 @@ function AdminDrawerNavigator() {
     >
       <Drawer.Screen name="Home" component={HomePage} />
       <Drawer.Screen name="Donations" component={DonationsPage} />
+      <Drawer.Screen name="DonationList" component={DonationListScreen} />
+      <Drawer.Screen name="ManageUser" component={ManageUserScreen} />
     </Drawer.Navigator>
   );
 }
 
-// User Drawer Navigator (Limited Access)
+// User Drawer Navigator
 function UserDrawerNavigator() {
   return (
     <Drawer.Navigator
@@ -170,20 +229,17 @@ function UserDrawerNavigator() {
 
 // Main Role-based Navigator
 export default function RoleBasedNavigator() {
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
 
-  // Create Stack Navigator for additional screens
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {isAdmin() ? (
-        // Admin gets full access with drawer
         <Stack.Screen name="AdminDrawer" component={AdminDrawerNavigator} />
       ) : (
-        // Non-admin users get limited access
         <Stack.Screen name="UserDrawer" component={UserDrawerNavigator} />
       )}
 
-      {/* Protected admin-only screens that are not in drawer */}
+      {/* Hidden admin-only stack screens */}
       {isAdmin() && (
         <>
           <Stack.Screen name="ManageUsers" component={DonationsPage} />
@@ -200,6 +256,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.cardBg,
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
   drawerHeader: {
     backgroundColor: colors.primary,
     paddingTop: 60,
@@ -208,10 +268,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     shadowColor: colors.shadowDark,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
@@ -237,10 +294,8 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     marginTop: 8,
-    overflow: 'hidden',
   },
   drawerItems: {
-    flex: 1,
     paddingTop: 24,
     paddingHorizontal: 8,
   },
@@ -253,10 +308,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
     borderRadius: 16,
     shadowColor: colors.shadowLight,
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.5,
     shadowRadius: 2,
     elevation: 1,

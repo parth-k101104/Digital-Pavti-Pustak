@@ -5,20 +5,32 @@ const API_BASE_URL = 'http://localhost:8080/api';
 
 // API endpoints
 const ENDPOINTS = {
+  // Auth
   LOGIN: '/auth/login',
   VALIDATE: '/auth/validate',
   ME: '/auth/me',
   LOGOUT: '/auth/logout',
-  USERS: '/auth/users',
+
+  // System info
   HEALTH: '/health',
   INFO: '/info',
-  // Donation endpoints
+
+  // Donations
   DONATIONS: '/donations',
   DONATIONS_BY_YEAR: '/donations',
   DONATIONS_ALL: '/donations/all',
   DONATIONS_YEARS: '/donations/years',
   DONATIONS_STATS: '/donations',
   DONATIONS_HEALTH: '/donations/health',
+
+  // Users
+  USERS: '/users',
+  USERS_CREATE: '/users/create',
+  USERS_ACTIVE: '/users/active',
+  USERS_ROLE: '/users/role',
+  USERS_DEACTIVATE: '/users/deactivate',
+  USERS_UPDATE_PASSWORD: '/users/update-password',
+  USERS_HEALTH: '/users/health',
 };
 
 /**
@@ -29,9 +41,7 @@ class ApiService {
     this.baseURL = API_BASE_URL;
   }
 
-  /**
-   * Get stored JWT token
-   */
+  // ======== TOKEN HANDLERS ========
   async getToken() {
     try {
       return await AsyncStorage.getItem('jwt_token');
@@ -41,9 +51,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Store JWT token
-   */
   async setToken(token) {
     try {
       await AsyncStorage.setItem('jwt_token', token);
@@ -52,9 +59,6 @@ class ApiService {
     }
   }
 
-  /**
-   * Remove JWT token
-   */
   async removeToken() {
     try {
       await AsyncStorage.removeItem('jwt_token');
@@ -63,48 +67,33 @@ class ApiService {
     }
   }
 
-  /**
-   * Make HTTP request with proper headers and error handling
-   */
+  // ======== GENERIC REQUEST HANDLER ========
   async makeRequest(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
     const token = await this.getToken();
 
-    const defaultHeaders = {
-      'Content-Type': 'application/json',
-    };
-
-    // Add Authorization header if token exists
+    const defaultHeaders = { 'Content-Type': 'application/json' };
     if (token && !options.skipAuth) {
       defaultHeaders.Authorization = `Bearer ${token}`;
     }
 
     const config = {
       method: 'GET',
-      headers: {
-        ...defaultHeaders,
-        ...options.headers,
-      },
+      headers: { ...defaultHeaders, ...options.headers },
       ...options,
     };
 
     try {
       console.log(`🌐 API Request: ${config.method} ${url}`);
-
       const response = await fetch(url, config);
 
-      // Handle non-JSON responses
-      let data;
       const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        data = { message: await response.text() };
-      }
+      const data = contentType && contentType.includes('application/json')
+        ? await response.json()
+        : { message: await response.text() };
 
       console.log(`📡 API Response: ${response.status}`, data);
 
-      // Handle 401 Unauthorized - token might be expired
       if (response.status === 401) {
         console.log('🔑 Token expired or invalid, removing from storage');
         await this.removeToken();
@@ -120,15 +109,10 @@ class ApiService {
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
 
-      return {
-        success: true,
-        data,
-        status: response.status,
-      };
+      return { success: true, data, status: response.status };
     } catch (error) {
       console.error(`❌ API Error for ${endpoint}:`, error);
 
-      // Handle network errors
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         return {
           success: false,
@@ -146,9 +130,7 @@ class ApiService {
     }
   }
 
-  /**
-   * User login with firstName_lastName format
-   */
+  // ======== AUTH METHODS ========
   async login(name, password) {
     return this.makeRequest(ENDPOINTS.LOGIN, {
       method: 'POST',
@@ -157,64 +139,29 @@ class ApiService {
     });
   }
 
-  /**
-   * Validate current token
-   */
   async validateToken() {
-    return this.makeRequest(ENDPOINTS.VALIDATE, {
-      method: 'POST',
-    });
+    return this.makeRequest(ENDPOINTS.VALIDATE, { method: 'POST' });
   }
 
-  /**
-   * Get current user info
-   */
   async getCurrentUser() {
     return this.makeRequest(ENDPOINTS.ME);
   }
 
-  /**
-   * User logout
-   */
   async logout() {
-    const result = await this.makeRequest(ENDPOINTS.LOGOUT, {
-      method: 'POST',
-    });
-
-    // Always remove token locally, regardless of server response
-    await this.removeToken();
-
+    const result = await this.makeRequest(ENDPOINTS.LOGOUT, { method: 'POST' });
+    await this.removeToken(); // Always remove token locally
     return result;
   }
 
-  /**
-   * Get all users (admin only)
-   */
-  async getAllUsers() {
-    return this.makeRequest(ENDPOINTS.USERS);
-  }
-
-  /**
-   * Health check
-   */
+  // ======== SYSTEM INFO ========
   async healthCheck() {
-    return this.makeRequest(ENDPOINTS.HEALTH, {
-      skipAuth: true,
-    });
+    return this.makeRequest(ENDPOINTS.HEALTH, { skipAuth: true });
   }
 
-  /**
-   * Get application info
-   */
   async getAppInfo() {
-    return this.makeRequest(ENDPOINTS.INFO, {
-      skipAuth: true,
-    });
+    return this.makeRequest(ENDPOINTS.INFO, { skipAuth: true });
   }
 
-  /**
-   * Check if backend is available
-   */
   async isBackendAvailable() {
     try {
       const result = await this.healthCheck();
@@ -225,11 +172,7 @@ class ApiService {
     }
   }
 
-  // ===== DONATION API METHODS =====
-
-  /**
-   * Create a new donation
-   */
+  // ======== DONATION METHODS ========
   async createDonation(donationData) {
     return this.makeRequest(ENDPOINTS.DONATIONS, {
       method: 'POST',
@@ -237,23 +180,14 @@ class ApiService {
     });
   }
 
-  /**
-   * Get donations for a specific year
-   */
   async getDonationsByYear(year) {
     return this.makeRequest(`${ENDPOINTS.DONATIONS_BY_YEAR}/${year}`);
   }
 
-  /**
-   * Get all donations (admin only)
-   */
   async getAllDonations() {
     return this.makeRequest(ENDPOINTS.DONATIONS_ALL);
   }
 
-  /**
-   * Update a donation (admin only)
-   */
   async updateDonation(year, donationId, donationData) {
     return this.makeRequest(`${ENDPOINTS.DONATIONS}/${year}/${donationId}`, {
       method: 'PUT',
@@ -261,34 +195,56 @@ class ApiService {
     });
   }
 
-  /**
-   * Delete a donation (admin only)
-   */
   async deleteDonation(year, donationId) {
     return this.makeRequest(`${ENDPOINTS.DONATIONS}/${year}/${donationId}`, {
       method: 'DELETE',
     });
   }
 
-  /**
-   * Get available years with donation data
-   */
   async getAvailableYears() {
     return this.makeRequest(ENDPOINTS.DONATIONS_YEARS);
   }
 
-  /**
-   * Get statistics for a specific year
-   */
   async getYearStats(year) {
     return this.makeRequest(`${ENDPOINTS.DONATIONS_STATS}/${year}/stats`);
   }
 
-  /**
-   * Check donation service health
-   */
   async checkDonationHealth() {
     return this.makeRequest(ENDPOINTS.DONATIONS_HEALTH);
+  }
+
+  // ======== USER METHODS ========
+  async createUser(userData) {
+    return this.makeRequest(ENDPOINTS.USERS_CREATE, {
+      method: 'POST',
+      body: JSON.stringify(userData),
+    });
+  }
+
+  async getAllActiveUsers() {
+    return this.makeRequest(ENDPOINTS.USERS_ACTIVE);
+  }
+
+  async getUsersByRole(role) {
+    return this.makeRequest(`${ENDPOINTS.USERS_ROLE}/${role}`);
+  }
+
+  async deactivateUser(firstName, lastName) {
+    return this.makeRequest(`${ENDPOINTS.USERS_DEACTIVATE}/${firstName}/${lastName}`, {
+      method: 'PUT',
+    });
+  }
+
+  async updatePassword(firstName, lastName, newPassword) {
+    const query = `?newPassword=${encodeURIComponent(newPassword)}`;
+    return this.makeRequest(
+      `${ENDPOINTS.USERS_UPDATE_PASSWORD}/${firstName}/${lastName}${query}`,
+      { method: 'PUT' }
+    );
+  }
+
+  async checkUserServiceHealth() {
+    return this.makeRequest(ENDPOINTS.USERS_HEALTH);
   }
 }
 
