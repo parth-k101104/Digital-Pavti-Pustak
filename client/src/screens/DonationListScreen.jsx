@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  Alert, 
-  RefreshControl, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  RefreshControl,
   TouchableOpacity,
   Animated,
   ActivityIndicator
@@ -28,10 +28,16 @@ export default function DonationListScreen() {
   const [stats, setStats] = useState(null);
 
   const navigation = useNavigation();
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
+  // ✅ Restrict non-admin users
   useEffect(() => {
+    if (!isAdmin()) {
+      Alert.alert("Access Denied", "Only administrators can view this page.");
+      navigation.goBack();
+      return;
+    }
     createFadeInAnimation(fadeAnim, 400).start();
     loadInitialData();
   }, []);
@@ -45,13 +51,9 @@ export default function DonationListScreen() {
 
   const loadInitialData = async () => {
     try {
-      await Promise.all([
-        loadAvailableYears(),
-        loadDonations(),
-        loadYearStats()
-      ]);
+      await Promise.all([loadAvailableYears(), loadDonations(), loadYearStats()]);
     } catch (error) {
-      console.error('Error loading initial data:', error);
+      console.error("Error loading initial data:", error);
     } finally {
       setLoading(false);
     }
@@ -60,27 +62,32 @@ export default function DonationListScreen() {
   const loadAvailableYears = async () => {
     try {
       const result = await apiService.getAvailableYears();
-      if (result.success) {
-        setAvailableYears(result.years || []);
+      console.log("🔍 API Response for years:", JSON.stringify(result, null, 2));
+
+      if (result.success && result.data) {
+        console.log("✅ Setting available years:", result.data.years);
+        setAvailableYears(result.data.years || []);
       }
     } catch (error) {
-      console.error('Error loading available years:', error);
+      console.error("Error loading available years:", error);
     }
   };
 
   const loadDonations = async () => {
     try {
-      const result = isAdmin() 
-        ? await apiService.getDonationsByYear(selectedYear)
-        : await apiService.getDonationsByYear(selectedYear);
-      
-      if (result.success) {
-        setDonations(result.donations || []);
+      const result = await apiService.getDonationsByYear(selectedYear);
+      console.log("🔍 API Response for donations:", JSON.stringify(result, null, 2));
+
+      if (result.success && result.data) {
+        console.log("✅ Setting donations:", result.data.donations);
+        setDonations(result.data.donations || []);
       } else {
-        Alert.alert("Error", result.message || "Failed to load donations");
+        const errorMessage = result.data?.message || result.error || "Failed to load donations";
+        console.log("❌ Error loading donations:", errorMessage);
+        Alert.alert("Error", errorMessage);
       }
     } catch (error) {
-      console.error('Error loading donations:', error);
+      console.error("Error loading donations:", error);
       Alert.alert("Error", "Failed to load donations. Please try again.");
     }
   };
@@ -88,15 +95,15 @@ export default function DonationListScreen() {
   const loadYearStats = async () => {
     try {
       const result = await apiService.getYearStats(selectedYear);
-      if (result.success) {
+      if (result.success && result.data) {
         setStats({
-          totalRecords: result.totalRecords,
-          firstDonationDate: result.firstDonationDate,
-          lastDonationDate: result.lastDonationDate
+          totalRecords: result.data.totalRecords,
+          firstDonationDate: result.data.firstDonationDate,
+          lastDonationDate: result.data.lastDonationDate,
         });
       }
     } catch (error) {
-      console.error('Error loading year stats:', error);
+      console.error("Error loading year stats:", error);
     }
   };
 
@@ -107,22 +114,7 @@ export default function DonationListScreen() {
     setRefreshing(false);
   };
 
-  const handleEditDonation = (donation) => {
-    if (!isAdmin()) {
-      Alert.alert("Access Denied", "Only administrators can edit donations.");
-      return;
-    }
-    
-    // Navigate to edit screen (to be implemented)
-    Alert.alert("Edit Donation", `Edit functionality for donation ID ${donation.id} will be implemented.`);
-  };
-
   const handleDeleteDonation = async (donation) => {
-    if (!isAdmin()) {
-      Alert.alert("Access Denied", "Only administrators can delete donations.");
-      return;
-    }
-
     Alert.alert(
       "Confirm Delete",
       `Are you sure you want to delete the donation from ${donation.donorName}?`,
@@ -136,71 +128,19 @@ export default function DonationListScreen() {
               const result = await apiService.deleteDonation(selectedYear, donation.id);
               if (result.success) {
                 Alert.alert("Success", "Donation deleted successfully");
-                loadDonations(); // Refresh the list
+                loadDonations();
               } else {
                 Alert.alert("Error", result.message || "Failed to delete donation");
               }
             } catch (error) {
-              console.error('Error deleting donation:', error);
+              console.error("Error deleting donation:", error);
               Alert.alert("Error", "Failed to delete donation. Please try again.");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
-
-  const renderDonationItem = ({ item }) => (
-    <View style={styles.donationCard}>
-      <View style={styles.donationHeader}>
-        <Text style={styles.donorName}>{item.donorName}</Text>
-        <Text style={styles.amount}>₹{item.donationAmount}</Text>
-      </View>
-      
-      <View style={styles.donationDetails}>
-        <Text style={styles.detailText}>
-          <Ionicons name="call" size={14} color={colors.textLight} /> {item.donorPhone}
-        </Text>
-        <Text style={styles.detailText}>
-          <Ionicons name="location" size={14} color={colors.textLight} /> {item.donorAddress}
-        </Text>
-        <Text style={styles.detailText}>
-          <Ionicons name="card" size={14} color={colors.textLight} /> {item.donationType}
-        </Text>
-        <Text style={styles.detailText}>
-          <Ionicons name="calendar" size={14} color={colors.textLight} /> {new Date(item.createdDate).toLocaleDateString()}
-        </Text>
-        <Text style={styles.detailText}>
-          <Ionicons name="person" size={14} color={colors.textLight} /> Created by: {item.createdBy}
-        </Text>
-        {item.notes && (
-          <Text style={styles.notesText}>
-            <Ionicons name="document-text" size={14} color={colors.textLight} /> {item.notes}
-          </Text>
-        )}
-      </View>
-
-      {isAdmin() && (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.editButton]}
-            onPress={() => handleEditDonation(item)}
-          >
-            <Ionicons name="pencil" size={16} color={colors.white} />
-            <Text style={styles.actionButtonText}>Edit</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={() => handleDeleteDonation(item)}
-          >
-            <Ionicons name="trash" size={16} color={colors.white} />
-            <Text style={styles.actionButtonText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
 
   const renderYearSelector = () => (
     <View style={styles.yearSelector}>
@@ -211,14 +151,16 @@ export default function DonationListScreen() {
             key={year}
             style={[
               styles.yearButton,
-              selectedYear === year && styles.selectedYearButton
+              selectedYear === year && styles.selectedYearButton,
             ]}
             onPress={() => setSelectedYear(year)}
           >
-            <Text style={[
-              styles.yearButtonText,
-              selectedYear === year && styles.selectedYearButtonText
-            ]}>
+            <Text
+              style={[
+                styles.yearButtonText,
+                selectedYear === year && styles.selectedYearButtonText,
+              ]}
+            >
               {year}
             </Text>
           </TouchableOpacity>
@@ -227,10 +169,10 @@ export default function DonationListScreen() {
     </View>
   );
 
-  const renderStats = () => (
+  const renderStats = () =>
     stats && (
       <View style={styles.statsContainer}>
-        <Text style={styles.statsTitle}>Year {selectedYear} Statistics</Text>
+        <Text style={styles.statsTitle}>Year {selectedYear} Summary</Text>
         <Text style={styles.statsText}>Total Donations: {stats.totalRecords}</Text>
         {stats.firstDonationDate && (
           <Text style={styles.statsText}>
@@ -243,7 +185,62 @@ export default function DonationListScreen() {
           </Text>
         )}
       </View>
-    )
+    );
+
+  const renderTable = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      style={styles.tableContainer}
+    >
+      <View>
+        {/* Table Header */}
+        <View style={[styles.tableRow, styles.tableHeader]}>
+          <Text style={[styles.tableCell, styles.headerText, { width: 80 }]}>ID</Text>
+          <Text style={[styles.tableCell, styles.headerText, { width: 160 }]}>Donor</Text>
+          <Text style={[styles.tableCell, styles.headerText, { width: 120 }]}>Amount</Text>
+          <Text style={[styles.tableCell, styles.headerText, { width: 120 }]}>Type</Text>
+          <Text style={[styles.tableCell, styles.headerText, { width: 160 }]}>Phone</Text>
+          <Text style={[styles.tableCell, styles.headerText, { width: 200 }]}>Address</Text>
+          <Text style={[styles.tableCell, styles.headerText, { width: 140 }]}>Date</Text>
+          <Text style={[styles.tableCell, styles.headerText, { width: 140 }]}>Created By</Text>
+          <Text style={[styles.tableCell, styles.headerText, { width: 100 }]}>Action</Text>
+        </View>
+
+        {/* Table Body */}
+        {donations.map((item, index) => (
+          <View
+            key={item.id || index}
+            style={[
+              styles.tableRow,
+              { backgroundColor: index % 2 === 0 ? "#f9f9f9" : "#fff" },
+            ]}
+          >
+            <Text style={[styles.tableCell, { width: 80 }]}>{item.id}</Text>
+            <Text style={[styles.tableCell, { width: 160 }]}>{item.donorName}</Text>
+            <Text style={[styles.tableCell, { width: 120 }]}>₹{item.donationAmount}</Text>
+            <Text style={[styles.tableCell, { width: 120 }]}>{item.donationType}</Text>
+            <Text style={[styles.tableCell, { width: 160 }]}>{item.donorPhone}</Text>
+            <Text style={[styles.tableCell, { width: 200 }]}>{item.donorAddress}</Text>
+            <Text style={[styles.tableCell, { width: 140 }]}>
+              {new Date(item.createdDate).toLocaleDateString()}
+            </Text>
+            <Text style={[styles.tableCell, { width: 140 }]}>{item.createdBy}</Text>
+
+            <TouchableOpacity
+              onPress={() => handleDeleteDonation(item)}
+              style={styles.deleteIcon}
+            >
+              <Ionicons name="trash" size={18} color="red" />
+            </TouchableOpacity>
+          </View>
+        ))}
+
+        {donations.length === 0 && (
+          <Text style={styles.emptyText}>No donations found for {selectedYear}</Text>
+        )}
+      </View>
+    </ScrollView>
   );
 
   if (loading) {
@@ -261,38 +258,16 @@ export default function DonationListScreen() {
   return (
     <View style={styles.container}>
       <Header title="Donation List" />
-      
+
       <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
         {renderYearSelector()}
         {renderStats()}
-        
-        <FlatList
-          data={donations}
-          renderItem={renderDonationItem}
-          keyExtractor={(item) => item.id.toString()}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="document-outline" size={64} color={colors.textMuted} />
-              <Text style={styles.emptyText}>No donations found for {selectedYear}</Text>
-              <Text style={styles.emptySubtext}>
-                {isAdmin() ? "All donations for this year will appear here" : "Your donations for this year will appear here"}
-              </Text>
-            </View>
-          }
-          contentContainerStyle={donations.length === 0 ? styles.emptyList : null}
-        />
 
-        <AnimatedButton
-          title="Add New Donation"
-          onPress={() => navigation.navigate('Donations')}
-          variant="primary"
-          size="large"
-          style={styles.addButton}
-          icon={<Ionicons name="add" size={20} color={colors.white} />}
-        />
+        <ScrollView
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        >
+          {renderTable()}
+        </ScrollView>
       </Animated.View>
     </View>
   );
@@ -370,64 +345,63 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginBottom: 4,
   },
-  donationCard: {
+
+  /*** 🧾 TABLE STYLING ***/
+  tableContainer: {
     backgroundColor: colors.cardBg,
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 12,
+    overflow: 'hidden',
   },
-  donationHeader: {
+  tableHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
   },
-  donorName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
+  tableHeaderText: {
     flex: 1,
+    color: colors.white,
+    fontWeight: '600',
+    fontSize: 13,
+    textAlign: 'center',
   },
-  amount: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  donationDetails: {
-    marginBottom: 12,
-  },
-  detailText: {
-    fontSize: 14,
-    color: colors.textLight,
-    marginBottom: 4,
+  tableRow: {
     flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    backgroundColor: colors.cardBg,
+  },
+  tableRowAlt: {
+    backgroundColor: colors.background,
+  },
+  tableCell: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 13,
+    color: colors.text,
+  },
+  tableCellSmall: {
+    flex: 0.6,
+  },
+  tableCellLarge: {
+    flex: 1.4,
+  },
+  tableActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  notesText: {
-    fontSize: 14,
-    color: colors.textLight,
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  actionButtons: {
-    flexDirection: 'row',
     gap: 8,
-    marginTop: 8,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 6,
-    gap: 4,
   },
   editButton: {
     backgroundColor: colors.warning,
@@ -439,7 +413,10 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 12,
     fontWeight: '500',
+    marginLeft: 4,
   },
+
+  /*** EMPTY STATE + ADD BUTTON ***/
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',

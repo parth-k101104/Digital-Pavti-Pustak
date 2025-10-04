@@ -12,7 +12,6 @@ export default function HomePage() {
         <Header />
         <DonationsSummary />
         <UpdatePayments />
-        <RecentTransactions />
       </ScrollView>
     </ProtectedRoute>
   );

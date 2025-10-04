@@ -326,7 +326,7 @@ export default function DonationsPage() {
         setTouched({});
       } else {
         // Handle backend validation errors
-        const errorMessage = result.message || "Failed to submit donation";
+        const errorMessage = result.data?.message || result.error || "Failed to submit donation";
         showToastMessage(errorMessage, "error");
 
         // If there are specific field errors from backend, we could handle them here
